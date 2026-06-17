@@ -1,0 +1,45 @@
+tasks:
+  - name: "[Java 21] Create installation directory"
+    when: "ansible_os_family == 'Windows'"
+    file:
+      path: C:\Program Files\Java
+      state: directory
+
+  - name: "[Java 21] Extract archive"
+    when: "ansible_os_family == 'Windows'"
+    powershell:
+      inline: "Expand-Archive -Path 'C:\\Temp\\openjdk-21_windows-x64_bin.zip' -DestinationPath 'C:\\Program Files\\Java' -Force"
+
+  - name: "[Java 21] Add to system PATH"
+    when: "ansible_os_family == 'Windows'"
+    powershell:
+      inline: |
+        $current = [System.Environment]::GetEnvironmentVariable('Path', 'Machine')
+        if ($current -notlike '*C:\Program Files\Java\jdk-21\bin*') {
+          [System.Environment]::SetEnvironmentVariable('Path', $current + ';C:\Program Files\Java\jdk-21\bin', 'Machine')
+          Write-Host "PATH updated successfully"
+        } else {
+          Write-Host "PATH already contains Java 21"
+        }
+
+  - name: "[Java 21] Set JAVA_HOME environment variable"
+    when: "ansible_os_family == 'Windows'"
+    powershell:
+      inline: |
+        [System.Environment]::SetEnvironmentVariable('JAVA_HOME', 'C:\Program Files\Java\jdk-21', 'Machine')
+        Write-Host "JAVA_HOME set to C:\Program Files\Java\jdk-21"
+
+  - name: "[Java 21] Cleanup archive"
+    when: "ansible_os_family == 'Windows'"
+    remove:
+      path: C:\Temp\openjdk-21_windows-x64_bin.zip
+
+  - name: "[Java 21] Verify installation"
+    when: "ansible_os_family == 'Windows'"
+    powershell:
+      inline: "$v = & 'C:\\Program Files\\Java\\jdk-21\\bin\\java.exe' -version 2>&1; Write-Host $v"
+
+  - name: "[Java 21] Installation complete"
+    when: "ansible_os_family == 'Windows'"
+    debug:
+      msg: "OpenJDK 21 successfully installed at C:\\Program Files\\Java\\jdk-21"

@@ -1,0 +1,21 @@
+name: "Install DBeaver"
+
+tasks:
+  - name: "[DBeaver] Install silently"
+    when: "ansible_os_family == 'Windows'"
+    powershell:
+      inline: |
+        Start-Process -FilePath 'C:\Temp\dbeaver-ce-26.0.5-windows-aarch64.exe' -ArgumentList '/S' -Wait
+        Write-Host "DBeaver installed"
+
+  - name: "[DBeaver] Cleanup installer"
+    when: "ansible_os_family == 'Windows'"
+    powershell:
+      inline: |
+        Remove-Item -Path 'C:\Temp\dbeaver-ce-26.0.5-windows-aarch64.exe' -Force -ErrorAction SilentlyContinue
+        Write-Host "Installer cleaned"
+
+  - name: "[DBeaver] Installation complete"
+    when: "ansible_os_family == 'Windows'"
+    debug:
+      msg: "DBeaver CE 26.0.5 ARM64 successfully installed"

@@ -1,0 +1,74 @@
+name: Windows Development Bootstrap
+
+config:
+  remote_binaries_path: \\192.168.100.15\share\npkm\binaries
+  download_path: C:\\temp\\downloads
+  local_install_path: C:\\Program Files
+  java_win_installer_name: jdk-17.0.12_windows-x64_bin.exe
+  intellij_win_installer_name: idea-2026.1.exe
+  user_name: Guest
+  password:
+
+tasks:
+  - name: Create download folder
+    file:
+      path: "{{ download_path }}"
+      state: directory
+
+  - name: Authenticate remote server and copy binaries to local
+    command:
+      cmd: >
+        cmd.exe /c net use {{ remote_binaries_path }} /user:{{ user_name }} {{ password }} /persistent:no
+        && robocopy {{ remote_binaries_path }} {{ download_path }} /E & exit /b 0
+
+  - name: Install Java
+    command:
+      cmd: '{{ download_path }}\\{{ java_win_installer_name }} /s'
+
+  - name: Set JAVA_HOME
+    command:
+      cmd: >
+        cmd.exe /c powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command "
+        $installer='{{ java_win_installer_name }}';
+        $base=$installer.Split('.')[0];
+        $javaHome='{{ local_install_path }}\\Java\\' + $base;
+        [Environment]::SetEnvironmentVariable('JAVA_HOME',$javaHome,'Machine')
+        " >nul 2>&1
+
+  - name: Add Java to PATH
+    command:
+      cmd: >
+        cmd.exe /c powershell -NoProfile -ExecutionPolicy Bypass -Command "
+        $installer='{{ java_win_installer_name }}';
+        $base=$installer.Split('.')[0];
+        $javaBin='{{ local_install_path }}\\Java\\' + $base + '\\bin';
+        $machinePath=[Environment]::GetEnvironmentVariable('Path','Machine');
+        if ($machinePath -notlike ('*' + $javaBin + '*')) {
+            [Environment]::SetEnvironmentVariable(
+                'Path',
+                $machinePath + ';' + $javaBin,
+                'Machine'
+            )
+        }
+        " >nul 2>&1
+
+  - name: Install IntelliJ
+    command:
+      cmd: "{{ download_path }}\\{{ intellij_win_installer_name }} /S"
+
+  - name: Verify IntelliJ installation
+    command:
+      cmd: >
+        cmd.exe /c powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command "
+        if (-not (Test-Path 'C:\\Program Files\\JetBrains')) {
+          exit 1
+        }
+        " >nul 2>&1
+
+  - name: Delete download folder
+    command:
+      cmd: >
+        cmd.exe /c powershell -NoProfile -ExecutionPolicy Bypass -Command "
+        Start-Sleep -Seconds 5;
+        Remove-Item '{{ download_path }}' -Recurse -Force -ErrorAction SilentlyContinue
+        " >nul 2>&1

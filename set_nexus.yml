@@ -1,0 +1,60 @@
+name: "Configure Nexus"
+
+tasks:
+  - name: "[Nexus] Create Maven settings directory"
+    when: "ansible_os_family == 'Windows'"
+    powershell:
+      inline: |
+        New-Item -ItemType Directory -Path "$env:USERPROFILE\.m2" -Force
+        Write-Host "Maven directory created"
+
+  - name: "[Nexus] Configure settings.xml"
+    when: "ansible_os_family == 'Windows'"
+    powershell:
+      inline: |
+        $lines = @(
+          '<?xml version="1.0" encoding="UTF-8"?>',
+          '<settings xmlns="http://maven.apache.org/SETTINGS/1.0.0">',
+          '  <mirrors>',
+          '    <mirror>',
+          '      <id>nexus</id>',
+          '      <mirrorOf>*</mirrorOf>',
+          '      <url>http://10.101.2.216:8081/repository/maven-public/</url>',
+          '    </mirror>',
+          '  </mirrors>',
+          '  <profiles>',
+          '    <profile>',
+          '      <id>nexus</id>',
+          '      <repositories>',
+          '        <repository>',
+          '          <id>nexus</id>',
+          '          <url>http://10.101.2.216:8081/repository/maven-public/</url>',
+          '          <releases><enabled>true</enabled></releases>',
+          '          <snapshots><enabled>true</enabled></snapshots>',
+          '        </repository>',
+          '      </repositories>',
+          '    </profile>',
+          '  </profiles>',
+          '  <activeProfiles>',
+          '    <activeProfile>nexus</activeProfile>',
+          '  </activeProfiles>',
+          '</settings>'
+        )
+        $lines | Set-Content -Path "$env:USERPROFILE\.m2\settings.xml" -Encoding UTF8
+        Write-Host "settings.xml configured"
+
+  - name: "[Nexus] Verify configuration"
+    when: "ansible_os_family == 'Windows'"
+    powershell:
+      inline: |
+        if (Test-Path "$env:USERPROFILE\.m2\settings.xml") {
+          Write-Host "settings.xml found"
+        } else {
+          Write-Host "settings.xml not found"
+          exit 1
+        }
+
+  - name: "[Nexus] Configuration complete"
+    when: "ansible_os_family == 'Windows'"
+    debug:
+      msg: "Nexus configured at 10.101.2.216:8081"

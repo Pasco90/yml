@@ -1,0 +1,74 @@
+name: "Install npkm-coni/nuke"
+
+tasks:
+  - name: "[npkm-coni] Create installation directory"
+    when: "ansible_os_family == 'Windows'"
+    file:
+      path: C:\Program Files\npkm
+      state: directory
+
+  - name: "[npkm-coni] Copy executable"
+    when: "ansible_os_family == 'Windows'"
+    powershell:
+      inline: |
+        Copy-Item -Path 'C:\Temp\npkm-coni.exe' -Destination 'C:\Program Files\npkm\npkm.exe' -Force
+        Write-Host "npkm-coni.exe copied"
+
+  - name: "[nuke] Create installation directory"
+    when: "ansible_os_family == 'Windows'"
+    powershell:
+      inline: |
+        New-Item -ItemType Directory -Path "$env:LOCALAPPDATA\Temp\nuke-intellij-plugin" -Force | Out-Null
+        Write-Host "nuke directory created"
+
+  - name: "[nuke] Copy nuke executable"
+    when: "ansible_os_family == 'Windows'"
+    powershell:
+      inline: |
+        Copy-Item -Path 'C:\Temp\nuke.exe' -Destination "$env:LOCALAPPDATA\Temp\nuke-intellij-plugin\nuke.exe" -Force
+        Write-Host "nuke.exe copied"
+
+  - name: "[npkm-coni] Add npkm to system PATH"
+    when: "ansible_os_family == 'Windows'"
+    powershell:
+      inline: |
+        $current = [System.Environment]::GetEnvironmentVariable('Path', 'Machine')
+        if ($current -notlike '*C:\Program Files\npkm*') {
+          [System.Environment]::SetEnvironmentVariable('Path', $current + ';C:\Program Files\npkm', 'Machine')
+          Write-Host "PATH updated with npkm"
+        } else {
+          Write-Host "PATH already contains npkm"
+        }
+
+  - name: "[nuke] Add nuke to system PATH"
+    when: "ansible_os_family == 'Windows'"
+    powershell:
+      inline: |
+        $p = "$env:LOCALAPPDATA\Temp\nuke-intellij-plugin"
+        $current = [System.Environment]::GetEnvironmentVariable('Path', 'Machine')
+        if ($current -notlike '*nuke-intellij-plugin*') {
+          [System.Environment]::SetEnvironmentVariable('Path', $current + ';' + $p, 'Machine')
+          Write-Host "PATH updated with nuke"
+        } else {
+          Write-Host "PATH already contains nuke"
+        }
+
+  - name: "[npkm-coni] Verify installation"
+    when: "ansible_os_family == 'Windows'"
+    powershell:
+      inline: |
+        & 'C:\Program Files\npkm\npkm.exe' --version
+        & "$env:LOCALAPPDATA\Temp\nuke-intellij-plugin\nuke.exe" --version
+
+  - name: "[npkm-coni] Cleanup temp files"
+    when: "ansible_os_family == 'Windows'"
+    powershell:
+      inline: |
+        Remove-Item -Path 'C:\Temp\npkm-coni.exe' -Force -ErrorAction SilentlyContinue
+        Remove-Item -Path 'C:\Temp\nuke.exe' -Force -ErrorAction SilentlyContinue
+        Write-Host "Temp files cleaned"
+
+  - name: "[npkm-coni] Installation complete"
+    when: "ansible_os_family == 'Windows'"
+    debug:
+      msg: "npkm-coni and nuke installed successfully"

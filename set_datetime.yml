@@ -1,0 +1,25 @@
+- name: Manage datetime on remote servers
+  hosts: all
+  become: true
+  tasks:
+    - name: Check current datetime
+      command: date
+      register: current_date
+
+    - name: Print current datetime
+      debug:
+        msg: "{{ inventory_hostname }}: {{ current_date.stdout }}"
+
+    - name: Disable NTP sync
+      command: timedatectl set-ntp false
+
+    - name: Set system datetime
+      command: timedatectl set-time "{{ target_datetime }}"
+
+    - name: Verify datetime was applied
+      command: date
+      register: updated_date
+
+    - name: Print updated datetime
+      debug:
+        msg: "{{ inventory_hostname }} updated to: {{ updated_date.stdout }}"

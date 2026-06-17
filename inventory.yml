@@ -1,0 +1,23 @@
+all:
+  children:
+    dev:
+      hosts:
+        dev-server:
+          ansible_host: 192.168.1.10
+          ansible_user: ec2-user
+          target_datetime: "2026-05-15 09:00:00"
+
+    ec2:
+      hosts:
+        ec2-database:
+          ansible_host: IP
+          ansible_user: ec2-user
+          target_datetime: "2026-05-15 09:00:00"
+        ec2-appserver:
+          ansible_host: IP
+          ansible_user: ec2-user
+          target_datetime: "2026-05-15 09:00:00"
+        ec2-interface:
+          ansible_host: IP
+          ansible_user: ec2-user
+          target_datetime: "2026-05-15 09:00:00"
