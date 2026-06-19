@@ -5,7 +5,7 @@ tasks:
     when: "ansible_os_family == 'Windows'"
     powershell:
       inline: |
-        Start-Process -FilePath "D:\Temp\VSCodeSetup-arm64-1.120.0.exe" -ArgumentList "/VERYSILENT","/NORESTART","/MERGETASKS=!runcode,addcontextmenufiles,addcontextmenufolders,associatewithfiles,addtopath" -Wait
+        Start-Process -FilePath "D:\Temp\VSCodeUserSetup-x64-1.123.0.exe" -ArgumentList "/VERYSILENT","/NORESTART","/MERGETASKS=!runcode,addcontextmenufiles,addcontextmenufolders,associatewithfiles,addtopath" -Wait
         Write-Host "VS Code installed"
 
   - name: "[VSCode] Verify installation"
@@ -18,7 +18,7 @@ tasks:
     when: "ansible_os_family == 'Windows'"
     powershell:
       inline: |
-        Remove-Item -Path "D:\Temp\VSCodeSetup-arm64-1.120.0.exe" -Force -ErrorAction SilentlyContinue
+        Remove-Item -Path "D:\Temp\VSCodeUserSetup-x64-1.123.0.exe" -Force -ErrorAction SilentlyContinue
         Write-Host "Installer cleaned"
 
   - name: "[VSCode] Create desktop shortcut"
@@ -37,4 +37,4 @@ tasks:
   - name: "[VSCode] Installation complete"
     when: "ansible_os_family == 'Windows'"
     debug:
-      msg: "VS Code successfully installed"
+      msg: "VS Code 1.123.0 successfully installed"

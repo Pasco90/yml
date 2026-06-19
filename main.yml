@@ -2,25 +2,27 @@ name: "Copy of installation files"
 
 # ============================================================
 #  PRE-REQUIS : lancer setup.bat AVANT ce playbook.
-#  setup.bat monte le partage japonais sur S: (npkm-coni ne
-#  sait pas lire un chemin UNC contenant des caracteres japonais,
-#  donc on passe par un lecteur S: en ASCII).
+#  setup.bat monte le partage japonais sur S:.
 #
 #  Ordre de deploiement sur chaque poste :
-#    1) double-clic / .\setup.bat
+#    1) .\setup.bat
 #    2) npkm-coni .\main.yml
+#
+#  NOTE : IntelliJ n'est PAS installe via un exe.
+#  C'est une installation portable (faite sur un autre PC) :
+#  on copie le dossier "S:\IntelliJ IDEA" tel quel.
 # ============================================================
 
 config:
+  # Fichiers (exe / zip) a installer ou extraire
   binaries_windows:
     - Git-2.54.0-64-bit.exe
-    - openjdk-21_windows-x64_bin.zip
+    - jdk21.0.8_9.zip
     - npkm-coni.exe
     - npkm-intellij-plugin-1.0.0.zip
     - nuke-intellij-plugin-1.0.0.zip
     - nuke.exe
-    - idea-2026.1.1-aarch64.exe
-    - VSCodeSetup-arm64-1.120.0.exe
+    - VSCodeUserSetup-x64-1.123.0.exe
     - dbeaver-ce-26.1.0-windows-x86_64.exe
 
 tasks:
@@ -30,7 +32,7 @@ tasks:
       path: D:\Temp
       state: directory
 
-  - name: "COPY - Fetching files from share (S:)"
+  - name: "COPY - Fetching binary files from share (S:)"
     when: "ansible_os_family == 'Windows'"
     copy:
       src: "S:\\{{ item }}"

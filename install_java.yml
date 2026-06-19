@@ -11,14 +11,14 @@ tasks:
     when: "ansible_os_family == 'Windows'"
     powershell:
       inline: |
-        Expand-Archive -Path "D:\Temp\openjdk-21_windows-x64_bin.zip" -DestinationPath "D:\Program Files\Java" -Force
+        Expand-Archive -Path "D:\Temp\jdk21.0.8_9.zip" -DestinationPath "D:\Program Files\Java" -Force
         Write-Host "Archive extracted"
 
   - name: "[Java 21] Add to user PATH"
     when: "ansible_os_family == 'Windows'"
     powershell:
       inline: |
-        # Detection dynamique du dossier jdk extrait (le nom exact varie selon la version)
+        # Detection dynamique du dossier jdk extrait
         $jdkDir = Get-ChildItem -Path "D:\Program Files\Java" -Directory | Where-Object { $_.Name -like "jdk*" } | Select-Object -First 1
         $bin = "$($jdkDir.FullName)\bin"
         $current = [System.Environment]::GetEnvironmentVariable('Path', 'User')
@@ -41,7 +41,7 @@ tasks:
     when: "ansible_os_family == 'Windows'"
     powershell:
       inline: |
-        Remove-Item -Path "D:\Temp\openjdk-21_windows-x64_bin.zip" -Force -ErrorAction SilentlyContinue
+        Remove-Item -Path "D:\Temp\jdk21.0.8_9.zip" -Force -ErrorAction SilentlyContinue
         Write-Host "Archive cleaned"
 
   - name: "[Java 21] Verify installation"

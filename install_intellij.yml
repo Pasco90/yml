@@ -1,13 +1,30 @@
-name: "Install IntelliJ IDEA"
+name: "Install IntelliJ IDEA (portable folder)"
+
+# ============================================================
+#  IntelliJ n'est PAS installe via un exe.
+#  Le dossier "S:\IntelliJ IDEA" est une installation portable
+#  realisee sur un autre PC : on le copie tel quel vers D:\Tools.
+#  (S: doit etre monte par setup.bat)
+# ============================================================
 
 tasks:
-  - name: "[IntelliJ] Install silently"
+  - name: "[IntelliJ] Create Tools directory"
+    when: "ansible_os_family == 'Windows'"
+    file:
+      path: D:\Tools
+      state: directory
+
+  - name: "[IntelliJ] Copy portable installation from share"
     when: "ansible_os_family == 'Windows'"
     powershell:
       inline: |
+        $source = "S:\IntelliJ IDEA"
         $target = "D:\Tools\IntelliJ IDEA"
-        Start-Process -FilePath "D:\Temp\idea-2026.1.1-aarch64.exe" -ArgumentList "/S","/D=$target" -Wait
-        Write-Host "IntelliJ installed to $target"
+        if (Test-Path $target) {
+          Remove-Item -Path $target -Recurse -Force -ErrorAction SilentlyContinue
+        }
+        Copy-Item -Path $source -Destination $target -Recurse -Force
+        Write-Host "IntelliJ portable folder copied to $target"
 
   - name: "[IntelliJ] Add to user PATH"
     when: "ansible_os_family == 'Windows'"
@@ -61,14 +78,13 @@ tasks:
         $shortcut.Save()
         Write-Host "Desktop shortcut created"
 
-  - name: "[IntelliJ] Cleanup temp files"
+  - name: "[IntelliJ] Cleanup plugin zips"
     when: "ansible_os_family == 'Windows'"
     powershell:
       inline: |
-        Remove-Item -Path "D:\Temp\idea-2026.1.1-aarch64.exe" -Force -ErrorAction SilentlyContinue
         Remove-Item -Path "D:\Temp\npkm-intellij-plugin-1.0.0.zip" -Force -ErrorAction SilentlyContinue
         Remove-Item -Path "D:\Temp\nuke-intellij-plugin-1.0.0.zip" -Force -ErrorAction SilentlyContinue
-        Write-Host "Temp files cleaned"
+        Write-Host "Plugin zips cleaned"
 
   - name: "[IntelliJ] Verify installation"
     when: "ansible_os_family == 'Windows'"
@@ -85,4 +101,4 @@ tasks:
   - name: "[IntelliJ] Installation complete"
     when: "ansible_os_family == 'Windows'"
     debug:
-      msg: "IntelliJ IDEA successfully installed at D:\\Tools\\IntelliJ IDEA"
+      msg: "IntelliJ IDEA (portable) successfully installed at D:\\Tools\\IntelliJ IDEA"
