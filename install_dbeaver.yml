@@ -5,17 +5,43 @@ tasks:
     when: "ansible_os_family == 'Windows'"
     powershell:
       inline: |
-        Start-Process -FilePath 'C:\Temp\dbeaver-ce-26.0.5-windows-aarch64.exe' -ArgumentList '/S' -Wait
-        Write-Host "DBeaver installed"
+        $target = "$env:LOCALAPPDATA\DBeaver"
+        Start-Process -FilePath "D:\Temp\dbeaver-ce-26.1.0-windows-x86_64.exe" -ArgumentList "/S","/D=$target" -Wait
+        Write-Host "DBeaver installed to $target"
+
+  - name: "[DBeaver] Verify installation"
+    when: "ansible_os_family == 'Windows'"
+    powershell:
+      inline: |
+        $exe = "$env:LOCALAPPDATA\DBeaver\dbeaver.exe"
+        if (Test-Path $exe) {
+          Write-Host "DBeaver successfully found at $exe"
+        } else {
+          Write-Host "DBeaver NOT found"
+          exit 1
+        }
+
+  - name: "[DBeaver] Create desktop shortcut"
+    when: "ansible_os_family == 'Windows'"
+    powershell:
+      inline: |
+        $exe = "$env:LOCALAPPDATA\DBeaver\dbeaver.exe"
+        $shell = New-Object -ComObject WScript.Shell
+        $shortcut = $shell.CreateShortcut("$env:USERPROFILE\Desktop\DBeaver.lnk")
+        $shortcut.TargetPath = $exe
+        $shortcut.IconLocation = "$exe,0"
+        $shortcut.Description = "DBeaver Community"
+        $shortcut.Save()
+        Write-Host "DBeaver desktop shortcut created"
 
   - name: "[DBeaver] Cleanup installer"
     when: "ansible_os_family == 'Windows'"
     powershell:
       inline: |
-        Remove-Item -Path 'C:\Temp\dbeaver-ce-26.0.5-windows-aarch64.exe' -Force -ErrorAction SilentlyContinue
+        Remove-Item -Path "D:\Temp\dbeaver-ce-26.1.0-windows-x86_64.exe" -Force -ErrorAction SilentlyContinue
         Write-Host "Installer cleaned"
 
   - name: "[DBeaver] Installation complete"
     when: "ansible_os_family == 'Windows'"
     debug:
-      msg: "DBeaver CE 26.0.5 ARM64 successfully installed"
+      msg: "DBeaver CE 26.1.0 successfully installed"

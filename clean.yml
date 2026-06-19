@@ -5,58 +5,63 @@ tasks:
     when: "ansible_os_family == 'Windows'"
     powershell:
       inline: |
-        Remove-Item -Path 'C:\Program Files\Java' -Recurse -Force -ErrorAction SilentlyContinue
-        $current = [System.Environment]::GetEnvironmentVariable('Path', 'Machine')
+        Remove-Item -Path "D:\Program Files\Java" -Recurse -Force -ErrorAction SilentlyContinue
+        $current = [System.Environment]::GetEnvironmentVariable('Path', 'User')
         $updated = ($current -split ';' | Where-Object { $_ -notlike '*Java*' }) -join ';'
-        [System.Environment]::SetEnvironmentVariable('Path', $updated, 'Machine')
-        [System.Environment]::SetEnvironmentVariable('JAVA_HOME', $null, 'Machine')
+        [System.Environment]::SetEnvironmentVariable('Path', $updated, 'User')
+        [System.Environment]::SetEnvironmentVariable('JAVA_HOME', $null, 'User')
         Write-Host "Java removed"
 
   - name: "[Clean] Remove IntelliJ"
     when: "ansible_os_family == 'Windows'"
     powershell:
       inline: |
-        Remove-Item -Path 'C:\Program Files\JetBrains' -Recurse -Force -ErrorAction SilentlyContinue
+        Stop-Process -Name idea64 -Force -ErrorAction SilentlyContinue
+        Start-Sleep -Seconds 2
+        Remove-Item -Path "D:\Tools\IntelliJ IDEA" -Recurse -Force -ErrorAction SilentlyContinue
         Remove-Item -Path "$env:APPDATA\JetBrains" -Recurse -Force -ErrorAction SilentlyContinue
         Remove-Item -Path "$env:LOCALAPPDATA\JetBrains" -Recurse -Force -ErrorAction SilentlyContinue
-        $current = [System.Environment]::GetEnvironmentVariable('Path', 'Machine')
-        $updated = ($current -split ';' | Where-Object { $_ -notlike '*JetBrains*' }) -join ';'
-        [System.Environment]::SetEnvironmentVariable('Path', $updated, 'Machine')
-        Remove-Item -Path "C:\Users\Public\Desktop\IntelliJ IDEA.lnk" -Force -ErrorAction SilentlyContinue
+        $current = [System.Environment]::GetEnvironmentVariable('Path', 'User')
+        $updated = ($current -split ';' | Where-Object { $_ -notlike '*IntelliJ*' }) -join ';'
+        [System.Environment]::SetEnvironmentVariable('Path', $updated, 'User')
+        Remove-Item -Path "$env:USERPROFILE\Desktop\IntelliJ IDEA.lnk" -Force -ErrorAction SilentlyContinue
         Write-Host "IntelliJ removed"
 
   - name: "[Clean] Remove npkm and nuke"
     when: "ansible_os_family == 'Windows'"
     powershell:
       inline: |
-        Remove-Item -Path 'C:\Program Files\npkm' -Recurse -Force -ErrorAction SilentlyContinue
-        $current = [System.Environment]::GetEnvironmentVariable('Path', 'Machine')
-        $updated = ($current -split ';' | Where-Object { $_ -notlike '*npkm*' }) -join ';'
-        [System.Environment]::SetEnvironmentVariable('Path', $updated, 'Machine')
+        Remove-Item -Path "D:\Tools\npkm" -Recurse -Force -ErrorAction SilentlyContinue
+        Remove-Item -Path "D:\Tools\nuke" -Recurse -Force -ErrorAction SilentlyContinue
+        $current = [System.Environment]::GetEnvironmentVariable('Path', 'User')
+        $updated = ($current -split ';' | Where-Object { ($_ -notlike '*\npkm*') -and ($_ -notlike '*\nuke*') }) -join ';'
+        [System.Environment]::SetEnvironmentVariable('Path', $updated, 'User')
         Write-Host "npkm and nuke removed"
 
   - name: "[Clean] Remove VS Code"
     when: "ansible_os_family == 'Windows'"
     powershell:
       inline: |
-        Remove-Item -Path 'C:\Program Files\Microsoft VS Code' -Recurse -Force -ErrorAction SilentlyContinue
+        Stop-Process -Name Code -Force -ErrorAction SilentlyContinue
+        Start-Sleep -Seconds 2
+        Remove-Item -Path "$env:LOCALAPPDATA\Programs\Microsoft VS Code" -Recurse -Force -ErrorAction SilentlyContinue
         Remove-Item -Path "$env:APPDATA\Code" -Recurse -Force -ErrorAction SilentlyContinue
         Remove-Item -Path "$env:USERPROFILE\.vscode" -Recurse -Force -ErrorAction SilentlyContinue
-        $current = [System.Environment]::GetEnvironmentVariable('Path', 'Machine')
+        $current = [System.Environment]::GetEnvironmentVariable('Path', 'User')
         $updated = ($current -split ';' | Where-Object { $_ -notlike '*VS Code*' }) -join ';'
-        [System.Environment]::SetEnvironmentVariable('Path', $updated, 'Machine')
-        Remove-Item -Path "C:\Users\Public\Desktop\Visual Studio Code.lnk" -Force -ErrorAction SilentlyContinue
+        [System.Environment]::SetEnvironmentVariable('Path', $updated, 'User')
+        Remove-Item -Path "$env:USERPROFILE\Desktop\Visual Studio Code.lnk" -Force -ErrorAction SilentlyContinue
         Write-Host "VS Code removed"
 
   - name: "[Clean] Remove DBeaver"
     when: "ansible_os_family == 'Windows'"
     powershell:
       inline: |
-        Remove-Item -Path 'C:\Program Files\DBeaver' -Recurse -Force -ErrorAction SilentlyContinue
+        Stop-Process -Name dbeaver -Force -ErrorAction SilentlyContinue
+        Start-Sleep -Seconds 2
+        Remove-Item -Path "$env:LOCALAPPDATA\DBeaver" -Recurse -Force -ErrorAction SilentlyContinue
         Remove-Item -Path "$env:APPDATA\DBeaverData" -Recurse -Force -ErrorAction SilentlyContinue
-        $current = [System.Environment]::GetEnvironmentVariable('Path', 'Machine')
-        $updated = ($current -split ';' | Where-Object { $_ -notlike '*DBeaver*' }) -join ';'
-        [System.Environment]::SetEnvironmentVariable('Path', $updated, 'Machine')
+        Remove-Item -Path "$env:USERPROFILE\Desktop\DBeaver.lnk" -Force -ErrorAction SilentlyContinue
         Write-Host "DBeaver removed"
 
   - name: "[Clean] Remove Nexus configuration"
@@ -70,10 +75,17 @@ tasks:
     when: "ansible_os_family == 'Windows'"
     powershell:
       inline: |
-        Remove-Item -Path 'C:\Temp' -Recurse -Force -ErrorAction SilentlyContinue
+        Remove-Item -Path "D:\Temp" -Recurse -Force -ErrorAction SilentlyContinue
         Write-Host "Temp files removed"
+
+  - name: "[Clean] Unmount S: drive"
+    when: "ansible_os_family == 'Windows'"
+    powershell:
+      inline: |
+        & subst S: /d 2>$null
+        Write-Host "S: unmounted"
 
   - name: "[Clean] Done"
     when: "ansible_os_family == 'Windows'"
     debug:
-      msg: "Clean complete - Java, Maven, IntelliJ, npkm, nuke, VS Code, DBeaver, Nexus and temp files removed"
+      msg: "Clean complete - Java, IntelliJ, npkm, nuke, VS Code, DBeaver, Nexus and temp files removed"

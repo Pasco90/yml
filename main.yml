@@ -1,7 +1,19 @@
 name: "Copy of installation files"
 
+# ============================================================
+#  PRE-REQUIS : lancer setup.bat AVANT ce playbook.
+#  setup.bat monte le partage japonais sur S: (npkm-coni ne
+#  sait pas lire un chemin UNC contenant des caracteres japonais,
+#  donc on passe par un lecteur S: en ASCII).
+#
+#  Ordre de deploiement sur chaque poste :
+#    1) double-clic / .\setup.bat
+#    2) npkm-coni .\main.yml
+# ============================================================
+
 config:
   binaries_windows:
+    - Git-2.54.0-64-bit.exe
     - openjdk-21_windows-x64_bin.zip
     - npkm-coni.exe
     - npkm-intellij-plugin-1.0.0.zip
@@ -9,20 +21,20 @@ config:
     - nuke.exe
     - idea-2026.1.1-aarch64.exe
     - VSCodeSetup-arm64-1.120.0.exe
-    - dbeaver-ce-26.0.5-windows-aarch64.exe
+    - dbeaver-ce-26.1.0-windows-x86_64.exe
 
 tasks:
   - name: "GLOBAL - Create temp directory"
     when: "ansible_os_family == 'Windows'"
     file:
-      path: C:\Temp
+      path: D:\Temp
       state: directory
 
-  - name: "DOWNLOAD - Fetching files for Windows"
+  - name: "COPY - Fetching files from share (S:)"
     when: "ansible_os_family == 'Windows'"
-    get_url:
-      url: "http://192.168.64.2:8080/{{ item }}"
-      dest: "C:\\Temp\\{{ item }}"
+    copy:
+      src: "S:\\{{ item }}"
+      dest: "D:\\Temp\\{{ item }}"
     loop: config.binaries_windows
 
   - name: "LOG Files copied successfully"

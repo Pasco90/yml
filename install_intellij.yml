@@ -1,85 +1,88 @@
+name: "Install IntelliJ IDEA"
+
 tasks:
-  - name: "[IntelliJ] Install IntelliJ IDEA Community silently"
-    when: "ansible_os_family == 'Windows'"
-    powershell:
-      inline: "$p = Start-Process -FilePath 'C:\\Temp\\idea-2026.1.1-aarch64.exe' -ArgumentList '/S /D=C:\\Program Files\\JetBrains\\IntelliJ IDEA 2026.1.1' -PassThru; $spinner = @('|','/','-','\\'); $i = 0; while (!$p.HasExited) { Write-Host \"`r[$($spinner[$i % 4])] Installing IntelliJ IDEA Community Edition...\" -NoNewline; $i++; Start-Sleep -Milliseconds 200 }; Write-Host \"`rInstallation finished!                                    \""
-
-  - name: "[IntelliJ] Add to system PATH"
-    when: "ansible_os_family == 'Windows'"
-    powershell:
-      inline: "$current = [System.Environment]::GetEnvironmentVariable('Path', 'Machine'); if ($current -notlike '*JetBrains\\IntelliJ IDEA 2026.1.1\\bin*') { [System.Environment]::SetEnvironmentVariable('Path', $current + ';C:\\Program Files\\JetBrains\\IntelliJ IDEA 2026.1.1\\bin', 'Machine'); Write-Host 'PATH updated successfully' } else { Write-Host 'PATH already contains IntelliJ' }"
-
-  - name: "[IntelliJ] Debug plugin zip structure"
+  - name: "[IntelliJ] Install silently"
     when: "ansible_os_family == 'Windows'"
     powershell:
       inline: |
-        Add-Type -AssemblyName System.IO.Compression.FileSystem
-        $zip = [System.IO.Compression.ZipFile]::OpenRead('C:\Temp\npkm-intellij-plugin-1.0.0.zip')
-        $zip.Entries | ForEach-Object { Write-Host $_.FullName }
-        $zip.Dispose()
+        $target = "D:\Tools\IntelliJ IDEA"
+        Start-Process -FilePath "D:\Temp\idea-2026.1.1-aarch64.exe" -ArgumentList "/S","/D=$target" -Wait
+        Write-Host "IntelliJ installed to $target"
 
-  - name: "[IntelliJ] Install NPKM plugin in user plugins directory"
+  - name: "[IntelliJ] Add to user PATH"
     when: "ansible_os_family == 'Windows'"
     powershell:
       inline: |
-        $pluginPath = 'C:\Temp\npkm-intellij-plugin-1.0.0.zip'
-        $pluginsDir = "$env:APPDATA\JetBrains\IntelliJIdea2026.1\plugins"
-
-        if (!(Test-Path $pluginsDir)) {
-          New-Item -ItemType Directory -Path $pluginsDir | Out-Null
+        $bin = "D:\Tools\IntelliJ IDEA\bin"
+        $current = [System.Environment]::GetEnvironmentVariable('Path', 'User')
+        if ($current -notlike "*$bin*") {
+          [System.Environment]::SetEnvironmentVariable('Path', $current + ";$bin", 'User')
+          Write-Host "PATH updated successfully"
+        } else {
+          Write-Host "PATH already contains IntelliJ"
         }
 
+  - name: "[IntelliJ] Install NPKM plugin"
+    when: "ansible_os_family == 'Windows'"
+    powershell:
+      inline: |
+        $pluginPath = "D:\Temp\npkm-intellij-plugin-1.0.0.zip"
+        $pluginsDir = "$env:APPDATA\JetBrains\IntelliJIdea2026.1\plugins"
+        if (!(Test-Path $pluginsDir)) {
+          New-Item -ItemType Directory -Path $pluginsDir -Force | Out-Null
+        }
         Add-Type -AssemblyName System.IO.Compression.FileSystem
         [System.IO.Compression.ZipFile]::ExtractToDirectory($pluginPath, $pluginsDir)
-
         Write-Host "NPKM plugin installed in: $pluginsDir"
 
-  - name: "[IntelliJ] Install Nuke plugin in user plugins directory"
+  - name: "[IntelliJ] Install Nuke plugin"
     when: "ansible_os_family == 'Windows'"
     powershell:
       inline: |
-        $pluginPath = 'C:\Temp\nuke-intellij-plugin-1.0.0.zip'
+        $pluginPath = "D:\Temp\nuke-intellij-plugin-1.0.0.zip"
         $pluginsDir = "$env:APPDATA\JetBrains\IntelliJIdea2026.1\plugins"
-
         if (!(Test-Path $pluginsDir)) {
-          New-Item -ItemType Directory -Path $pluginsDir | Out-Null
+          New-Item -ItemType Directory -Path $pluginsDir -Force | Out-Null
         }
-
         Add-Type -AssemblyName System.IO.Compression.FileSystem
         [System.IO.Compression.ZipFile]::ExtractToDirectory($pluginPath, $pluginsDir)
-
         Write-Host "Nuke plugin installed in: $pluginsDir"
-
-  - name: "[IntelliJ] Cleanup plugin zips"
-    when: "ansible_os_family == 'Windows'"
-    powershell:
-      inline: |
-        Remove-Item 'C:\Temp\npkm-intellij-plugin-1.0.0.zip' -Force
-        Remove-Item 'C:\Temp\nuke-intellij-plugin-1.0.0.zip' -Force
-
-  - name: "[IntelliJ] Cleanup installer"
-    when: "ansible_os_family == 'Windows'"
-    remove:
-      path: C:\Temp\idea-2026.1.1-aarch64.exe
 
   - name: "[IntelliJ] Create desktop shortcut"
     when: "ansible_os_family == 'Windows'"
     powershell:
       inline: |
+        $exe = "D:\Tools\IntelliJ IDEA\bin\idea64.exe"
         $shell = New-Object -ComObject WScript.Shell
-        $shortcut = $shell.CreateShortcut("C:\Users\Public\Desktop\IntelliJ IDEA.lnk")
-        $shortcut.TargetPath = "C:\Program Files\JetBrains\IntelliJ IDEA 2026.1.1\bin\idea64.exe"
-        $shortcut.IconLocation = "C:\Program Files\JetBrains\IntelliJ IDEA 2026.1.1\bin\idea64.exe,0"
-        $shortcut.Description = "IntelliJ IDEA Community Edition"
+        $shortcut = $shell.CreateShortcut("$env:USERPROFILE\Desktop\IntelliJ IDEA.lnk")
+        $shortcut.TargetPath = $exe
+        $shortcut.IconLocation = "$exe,0"
+        $shortcut.Description = "IntelliJ IDEA"
         $shortcut.Save()
-        Write-Host "IntelliJ IDEA desktop shortcut created"
+        Write-Host "Desktop shortcut created"
+
+  - name: "[IntelliJ] Cleanup temp files"
+    when: "ansible_os_family == 'Windows'"
+    powershell:
+      inline: |
+        Remove-Item -Path "D:\Temp\idea-2026.1.1-aarch64.exe" -Force -ErrorAction SilentlyContinue
+        Remove-Item -Path "D:\Temp\npkm-intellij-plugin-1.0.0.zip" -Force -ErrorAction SilentlyContinue
+        Remove-Item -Path "D:\Temp\nuke-intellij-plugin-1.0.0.zip" -Force -ErrorAction SilentlyContinue
+        Write-Host "Temp files cleaned"
 
   - name: "[IntelliJ] Verify installation"
     when: "ansible_os_family == 'Windows'"
     powershell:
-      inline: "if (Test-Path 'C:\\Program Files\\JetBrains\\IntelliJ IDEA 2026.1.1\\bin\\idea64.exe') { Write-Host 'IntelliJ IDEA 2026.1.1 successfully found' } else { Write-Host 'IntelliJ IDEA 2026.1.1 NOT found'; exit 1 }"
+      inline: |
+        $exe = "D:\Tools\IntelliJ IDEA\bin\idea64.exe"
+        if (Test-Path $exe) {
+          Write-Host "IntelliJ IDEA successfully found at $exe"
+        } else {
+          Write-Host "IntelliJ IDEA NOT found"
+          exit 1
+        }
 
   - name: "[IntelliJ] Installation complete"
     when: "ansible_os_family == 'Windows'"
     debug:
-      msg: "IntelliJ IDEA Community 2026.1.1 ARM64 successfully installed at C:\\Program Files\\JetBrains\\IntelliJ IDEA 2026.1.1"
+      msg: "IntelliJ IDEA successfully installed at D:\\Tools\\IntelliJ IDEA"
