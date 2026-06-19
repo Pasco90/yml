@@ -23,7 +23,6 @@ config:
     - nuke-intellij-plugin-1.0.0.zip
     - nuke.exe
     - VSCodeUserSetup-x64-1.123.0.exe
-    - dbeaver-ce-26.1.0-windows-x86_64.exe
 
 tasks:
   - name: "GLOBAL - Create temp directory"

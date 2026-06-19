@@ -1,31 +1,48 @@
-name: "Install DBeaver"
+name: "Install DBeaver (portable folder)"
+
+# ============================================================
+#  L'installeur DBeaver ignore /S (ouvre une fenetre).
+#  On copie donc le dossier portable "S:\DBeaver" tel quel,
+#  comme pour IntelliJ. (S: doit etre monte par setup.bat)
+# ============================================================
 
 tasks:
-  - name: "[DBeaver] Install silently"
+  - name: "[DBeaver] Create Tools directory"
     when: "ansible_os_family == 'Windows'"
-    powershell:
-      inline: |
-        $target = "$env:LOCALAPPDATA\DBeaver"
-        Start-Process -FilePath "D:\Temp\dbeaver-ce-26.1.0-windows-x86_64.exe" -ArgumentList "/S","/D=$target" -Wait
-        Write-Host "DBeaver installed to $target"
+    file:
+      path: D:\Tools
+      state: directory
 
-  - name: "[DBeaver] Verify installation"
+  - name: "[DBeaver] Copy portable installation from share"
     when: "ansible_os_family == 'Windows'"
     powershell:
       inline: |
-        $exe = "$env:LOCALAPPDATA\DBeaver\dbeaver.exe"
-        if (Test-Path $exe) {
-          Write-Host "DBeaver successfully found at $exe"
+        $source = "S:\DBeaver"
+        $target = "D:\Tools\DBeaver"
+        if (Test-Path $target) {
+          Remove-Item -Path $target -Recurse -Force -ErrorAction SilentlyContinue
+        }
+        robocopy $source $target /E /MT:16 /R:2 /W:5 /NFL /NDL /NJH /NJS | Out-Null
+        Write-Host "DBeaver portable folder copied to $target"
+
+  - name: "[DBeaver] Add to user PATH"
+    when: "ansible_os_family == 'Windows'"
+    powershell:
+      inline: |
+        $bin = "D:\Tools\DBeaver"
+        $current = [System.Environment]::GetEnvironmentVariable('Path', 'User')
+        if ($current -notlike "*$bin*") {
+          [System.Environment]::SetEnvironmentVariable('Path', $current + ";$bin", 'User')
+          Write-Host "PATH updated successfully"
         } else {
-          Write-Host "DBeaver NOT found"
-          exit 1
+          Write-Host "PATH already contains DBeaver"
         }
 
   - name: "[DBeaver] Create desktop shortcut"
     when: "ansible_os_family == 'Windows'"
     powershell:
       inline: |
-        $exe = "$env:LOCALAPPDATA\DBeaver\dbeaver.exe"
+        $exe = "D:\Tools\DBeaver\dbeaver.exe"
         $shell = New-Object -ComObject WScript.Shell
         $shortcut = $shell.CreateShortcut("$env:USERPROFILE\Desktop\DBeaver.lnk")
         $shortcut.TargetPath = $exe
@@ -34,14 +51,19 @@ tasks:
         $shortcut.Save()
         Write-Host "DBeaver desktop shortcut created"
 
-  - name: "[DBeaver] Cleanup installer"
+  - name: "[DBeaver] Verify installation"
     when: "ansible_os_family == 'Windows'"
     powershell:
       inline: |
-        Remove-Item -Path "D:\Temp\dbeaver-ce-26.1.0-windows-x86_64.exe" -Force -ErrorAction SilentlyContinue
-        Write-Host "Installer cleaned"
+        $exe = "D:\Tools\DBeaver\dbeaver.exe"
+        if (Test-Path $exe) {
+          Write-Host "DBeaver successfully found at $exe"
+        } else {
+          Write-Host "DBeaver NOT found"
+          exit 1
+        }
 
   - name: "[DBeaver] Installation complete"
     when: "ansible_os_family == 'Windows'"
     debug:
-      msg: "DBeaver CE 26.1.0 successfully installed"
+      msg: "DBeaver (portable) successfully installed at D:\\Tools\\DBeaver"
