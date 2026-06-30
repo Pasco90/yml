@@ -14,5 +14,10 @@
    {:name "Show detected language"
     :debug {:msg "{{ os_lang.stdout }}"}
    }
+
+  {:name "Lang"
+ :vars {:lang "{{ os_lang.stdout }}"}
+ :debug {:msg "{{ install[\"java_\" + lang] }}"}
+}
  ]
 }
