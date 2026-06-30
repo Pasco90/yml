@@ -15,12 +15,12 @@
     :debug {:msg "{{ os_lang.stdout }}"}
    }
 
-  {:name "Lang"
- :when "{{ eq os_lang.stdout \"ja\" }}"
+ {:name "Lang"
+ :when "os_lang.stdout == \"ja\""
  :debug {:msg "Java 21 をインストール中"}
 }
 {:name "Lang"
- :when "{{ ne os_lang.stdout \"ja\" }}"
+ :when "os_lang.stdout != \"ja\""
  :debug {:msg "Installing Java 21"}
 }
 
