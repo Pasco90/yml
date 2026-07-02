@@ -1,0 +1,437 @@
+===================================================================
+  BOOTSTRAP PROJECT - v3 - DIAGNOSTICS INTEGRES
+  Structure a recreer :
+  bootstrap/
+    main.edn
+    clean.edn
+    utils/sysinfo.edn
+    utils/sysinfo_unix.sh
+    utils/sysinfo.ps1
+    utils/vars.edn
+    tasks/install_java.edn
+    tasks/install_git.edn
+    tasks/install_intellij.edn
+    tasks/install_vscode.edn
+    tasks/install_maven.edn
+    tasks/install_ant.edn
+    tasks/install_winscp.edn
+===================================================================
+
+  CHANGEMENTS v3 :
+  1. Chaque copie reseau (Windows) verifie D'ABORD que le fichier
+     source existe (Test-Path). Si non, le script AFFICHE une vraie
+     erreur rouge et s'arrete (exit 1) au lieu de dire 'changed'
+     a tort. Plus besoin de verifier a la main.
+  2. La copie elle-meme est dans un try/catch qui affiche le
+     message d'erreur exact en cas d'echec.
+  3. Apres extraction, Java/Maven/Ant sont retrouves par recherche
+     recursive du binaire (java.exe / mvn.cmd / ant.bat), peu
+     importe la structure exacte du zip (Corretto, Temurin, etc.).
+     Fini les erreurs 'in\java.exe not recognized'.
+  4. Bug ${HOME} corrige partout (New-Item + $env:USERPROFILE).
+===================================================================
+
+=== FILE: main.edn ===
+{:name "Bootstrap"
+ :hosts "localhost"
+ :tasks
+ [{:name "🧹 Clean and deduplicate PATH (win)"
+   :when "ansible_os_family == 'Windows'"
+   :powershell {:inline "$p = [Environment]::GetEnvironmentVariable('Path','User'); $clean = ($p -split ';' | Where-Object { $_ -ne '' } | Select-Object -Unique) -join ';'; [Environment]::SetEnvironmentVariable('Path', $clean, 'User'); Write-Host '✅ PATH cleaned'"}}
+
+  {:name "System info"
+   :include_tasks "utils/sysinfo.edn"}
+
+  {:name "Load URLs"
+   :include_tasks "utils/vars.edn"}
+
+  {:name "Install Java"
+   :include_tasks "tasks/install_java.edn"}
+
+  {:name "Install Git"
+   :include_tasks "tasks/install_git.edn"}
+
+  {:name "Install IntelliJ"
+   :include_tasks "tasks/install_intellij.edn"}
+
+  {:name "Install VS Code"
+   :include_tasks "tasks/install_vscode.edn"}
+
+  {:name "Install Maven"
+   :include_tasks "tasks/install_maven.edn"}
+
+  {:name "Install Ant"
+   :include_tasks "tasks/install_ant.edn"}
+
+  {:name "Install WinSCP"
+   :include_tasks "tasks/install_winscp.edn"}]}
+
+
+=== FILE: clean.edn ===
+{:name "Clean all (Java + Git + IntelliJ + VS Code + Maven + Ant + WinSCP)"
+ :hosts "localhost"
+ :tasks
+ [{:name "🗑  Remove Java (unix)"
+   :when "ansible_os_family == 'Unix'"
+   :shell {:cmd "rm -rf $HOME/java; if [ \"$(uname -s)\" = \"Darwin\" ]; then sed -i '' '/JAVA_HOME/d' $HOME/.zshrc 2>/dev/null; else sed -i '/JAVA_HOME/d' $HOME/.bashrc 2>/dev/null; fi; echo '✅ Java removed'"}}
+
+  {:name "🔍 Verify Java gone (unix)"
+   :when "ansible_os_family == 'Unix'"
+   :shell {:cmd "if [ \"$(uname -s)\" = \"Darwin\" ]; then /usr/libexec/java_home -V 2>&1 || true; else command -v java >/dev/null 2>&1 && java --version || echo '✅ Java gone'; fi"}}
+
+  {:name "🗑  Remove Maven (unix)"
+   :when "ansible_os_family == 'Unix'"
+   :shell {:cmd "rm -rf $HOME/maven; if [ \"$(uname -s)\" = \"Darwin\" ]; then sed -i '' '/MAVEN_HOME/d' $HOME/.zshrc 2>/dev/null; else sed -i '/MAVEN_HOME/d' $HOME/.bashrc 2>/dev/null; fi; echo '✅ Maven removed'"}}
+
+  {:name "🗑  Remove Ant (unix)"
+   :when "ansible_os_family == 'Unix'"
+   :shell {:cmd "rm -rf $HOME/ant; if [ \"$(uname -s)\" = \"Darwin\" ]; then sed -i '' '/ANT_HOME/d' $HOME/.zshrc 2>/dev/null; else sed -i '/ANT_HOME/d' $HOME/.bashrc 2>/dev/null; fi; echo '✅ Ant removed'"}}
+
+  {:name "🗑  Remove VS Code (unix)"
+   :when "ansible_os_family == 'Unix'"
+   :shell {:cmd "if [ \"$(uname -s)\" = \"Darwin\" ]; then rm -rf '/Applications/Visual Studio Code.app'; rm -f \"$HOME/Desktop/Visual Studio Code.app\"; else sudo apt-get remove -y code 2>/dev/null; fi; echo '✅ VS Code removed'"}}
+
+  {:name "🗑  Remove IntelliJ (unix)"
+   :when "ansible_os_family == 'Unix'"
+   :shell {:cmd "if [ \"$(uname -s)\" = \"Linux\" ]; then rm -rf $HOME/idea; rm -f $HOME/.local/share/applications/jetbrains-idea.desktop; fi; echo '✅ IntelliJ removed'"}}
+
+  {:name "🗑  Remove Desktop/Launchpad shortcuts (mac)"
+   :when "ansible_os_family == 'Unix'"
+   :shell {:cmd "if [ \"$(uname -s)\" = \"Darwin\" ]; then rm -f $HOME/Desktop/*.app; killall Dock 2>/dev/null; fi; echo '✅ Shortcuts cleaned'"}}
+
+  {:name "🗑  Remove Java (win)"
+   :when "ansible_os_family == 'Windows'"
+   :powershell {:inline "Remove-Item -Path $env:USERPROFILE\\java -Recurse -Force -ErrorAction SilentlyContinue; Remove-Item -Path 'C:\\Program Files\\Java' -Recurse -Force -ErrorAction SilentlyContinue; [Environment]::SetEnvironmentVariable('JAVA_HOME', $null, 'User'); [Environment]::SetEnvironmentVariable('JAVA_HOME', $null, 'Machine'); Write-Host '✅ Java removed'"}}
+
+  {:name "🗑  Uninstall Git silently (win)"
+   :when "ansible_os_family == 'Windows'"
+   :powershell {:inline "$u = 'C:\\Program Files\\Git\\unins000.exe'; if (Test-Path $u) { Start-Process -FilePath $u -ArgumentList '/VERYSILENT','/NORESTART','/SUPPRESSMSGBOXES' -Wait }; Remove-Item 'C:\\Program Files\\Git' -Recurse -Force -ErrorAction SilentlyContinue; Remove-Item \"$env:PUBLIC\\Desktop\\Git*.lnk\" -Force -ErrorAction SilentlyContinue; Write-Host '✅ Git removed'"}}
+
+  {:name "🗑  Uninstall IntelliJ silently (win)"
+   :when "ansible_os_family == 'Windows'"
+   :powershell {:inline "$dir = Get-ChildItem 'C:\\Program Files\\JetBrains' -Directory -ErrorAction SilentlyContinue | Select-Object -First 1; if ($dir) { $u = Join-Path $dir.FullName 'bin\\uninstall.exe'; if (Test-Path $u) { Start-Process -FilePath $u -ArgumentList '/S' -Wait } }; Remove-Item 'C:\\Program Files\\JetBrains' -Recurse -Force -ErrorAction SilentlyContinue; Remove-Item \"$env:USERPROFILE\\Desktop\\IntelliJ*.lnk\" -Force -ErrorAction SilentlyContinue; Remove-Item \"$env:PUBLIC\\Desktop\\IntelliJ*.lnk\" -Force -ErrorAction SilentlyContinue; Remove-Item \"$env:APPDATA\\Microsoft\\Windows\\Start Menu\\Programs\\JetBrains\" -Recurse -Force -ErrorAction SilentlyContinue; Write-Host '✅ IntelliJ removed'"}}
+
+  {:name "🗑  Uninstall VS Code silently (win)"
+   :when "ansible_os_family == 'Windows'"
+   :powershell {:inline "$u = \"$env:LOCALAPPDATA\\Programs\\Microsoft VS Code\\unins000.exe\"; if (Test-Path $u) { Start-Process -FilePath $u -ArgumentList '/VERYSILENT','/NORESTART' -Wait }; Remove-Item \"$env:LOCALAPPDATA\\Programs\\Microsoft VS Code\" -Recurse -Force -ErrorAction SilentlyContinue; Remove-Item \"$env:USERPROFILE\\Desktop\\Visual Studio Code.lnk\" -Force -ErrorAction SilentlyContinue; Remove-Item \"$env:APPDATA\\Microsoft\\Windows\\Start Menu\\Programs\\Visual Studio Code.lnk\" -Force -ErrorAction SilentlyContinue; Write-Host '✅ VS Code removed'"}}
+
+  {:name "🗑  Remove Maven (win)"
+   :when "ansible_os_family == 'Windows'"
+   :powershell {:inline "Remove-Item -Path $env:USERPROFILE\\maven -Recurse -Force -ErrorAction SilentlyContinue; [Environment]::SetEnvironmentVariable('MAVEN_HOME', $null, 'User'); Write-Host '✅ Maven removed'"}}
+
+  {:name "🗑  Remove Ant (win)"
+   :when "ansible_os_family == 'Windows'"
+   :powershell {:inline "Remove-Item -Path $env:USERPROFILE\\ant -Recurse -Force -ErrorAction SilentlyContinue; [Environment]::SetEnvironmentVariable('ANT_HOME', $null, 'User'); Write-Host '✅ Ant removed'"}}
+
+  {:name "🗑  Uninstall WinSCP silently (win)"
+   :when "ansible_os_family == 'Windows'"
+   :powershell {:inline "$u = 'C:\\Program Files (x86)\\WinSCP\\unins000.exe'; if (Test-Path $u) { Start-Process -FilePath $u -ArgumentList '/VERYSILENT','/NORESTART' -Wait }; Remove-Item 'C:\\Program Files (x86)\\WinSCP' -Recurse -Force -ErrorAction SilentlyContinue; Remove-Item \"$env:USERPROFILE\\Desktop\\WinSCP.lnk\" -Force -ErrorAction SilentlyContinue; Write-Host '✅ WinSCP removed'"}}
+
+  {:name "🔍 Verify (win)"
+   :when "ansible_os_family == 'Windows'"
+   :powershell {:inline "if (Test-Path $env:USERPROFILE\\java) { Write-Host '⚠️  Java dir still exists' } else { Write-Host '✅ Java gone' }; if (Test-Path 'C:\\Program Files\\Git') { Write-Host '⚠️  Git still exists' } else { Write-Host '✅ Git gone' }; if (Test-Path 'C:\\Program Files\\JetBrains') { Write-Host '⚠️  IntelliJ still exists' } else { Write-Host '✅ IntelliJ gone' }; if (Test-Path \"$env:LOCALAPPDATA\\Programs\\Microsoft VS Code\") { Write-Host '⚠️  VS Code still exists' } else { Write-Host '✅ VS Code gone' }; if (Test-Path $env:USERPROFILE\\maven) { Write-Host '⚠️  Maven still exists' } else { Write-Host '✅ Maven gone' }; if (Test-Path $env:USERPROFILE\\ant) { Write-Host '⚠️  Ant still exists' } else { Write-Host '✅ Ant gone' }; if (Test-Path 'C:\\Program Files (x86)\\WinSCP') { Write-Host '⚠️  WinSCP still exists' } else { Write-Host '✅ WinSCP gone' }"}}]}
+
+
+=== FILE: utils/sysinfo.edn ===
+[{:name "System info"
+  :when "ansible_os_family == 'Windows'"
+  :shell {:cmd "powershell -NoProfile -ExecutionPolicy Bypass -File utils\\sysinfo.ps1"}}
+
+ {:name "System info"
+  :when "ansible_os_family == 'Unix'"
+  :shell {:cmd "sh utils/sysinfo_unix.sh"}}]
+
+
+=== FILE: utils/sysinfo_unix.sh ===
+B='\033[1;36m'; G='\033[1;32m'; D='\033[0;90m'; N='\033[0m'
+echo ''
+printf "${B}  +------------------------------------+${N}\n"
+printf "${B}  |${N}  ${G}SYSTEM INFORMATION${N}                ${B}|${N}\n"
+printf "${B}  +------------------------------------+${N}\n"
+if [ "$(uname -s)" = "Darwin" ]; then
+  ARCH="$([ "$(sysctl -n sysctl.proc_translated 2>/dev/null)" = "1" ] && echo arm64 || sysctl -n hw.machine)"
+  VER="$(sw_vers -productVersion 2>/dev/null || echo n/a)"
+  LABEL='macOS'
+else
+  ARCH="$(uname -m)"
+  VER="$(. /etc/os-release 2>/dev/null && echo "$PRETTY_NAME" || echo n/a)"
+  LABEL='Distro'
+fi
+printf "${B}  |${N} %-8s ${D}:${N} %-22s ${B}|${N}\n" 'OS' "$(uname -s) $ARCH"
+printf "${B}  |${N} %-8s ${D}:${N} %-22s ${B}|${N}\n" 'Kernel' "$(uname -r)"
+printf "${B}  |${N} %-8s ${D}:${N} %-22s ${B}|${N}\n" "$LABEL" "$VER"
+printf "${B}  |${N} %-8s ${D}:${N} %-22s ${B}|${N}\n" 'User' "$(whoami)"
+printf "${B}  |${N} %-8s ${D}:${N} %-22s ${B}|${N}\n" 'Disk' "$(df -h $HOME | tail -1 | awk '{print $4" free / "$2}')"
+printf "${B}  +------------------------------------+${N}\n"
+echo ''
+
+
+=== FILE: utils/sysinfo.ps1 ===
+$arch = $env:PROCESSOR_ARCHITECTURE
+$ver = (Get-CimInstance Win32_OperatingSystem).Version
+$build = (Get-CimInstance Win32_OperatingSystem).BuildNumber
+$disk = Get-PSDrive C
+$free = [math]::Round($disk.Free/1GB)
+$total = [math]::Round(($disk.Free+$disk.Used)/1GB)
+Write-Host ""
+Write-Host "  +------------------------------------+" -ForegroundColor Cyan
+Write-Host "  |  SYSTEM INFORMATION                |" -ForegroundColor Green
+Write-Host "  +------------------------------------+" -ForegroundColor Cyan
+Write-Host "  | OS       : Windows $arch"
+Write-Host "  | Version  : $ver"
+Write-Host "  | Build    : $build"
+Write-Host "  | User     : $env:USERNAME"
+Write-Host "  | Disk     : $free GB free / $total GB"
+Write-Host "  +------------------------------------+" -ForegroundColor Cyan
+Write-Host ""
+
+=== FILE: utils/vars.edn ===
+[{:name "Load URLs (mac)"
+  :when "ansible_os_family == 'Unix'"
+  :set_fact {:jdk_url_mac "https://github.com/adoptium/temurin21-binaries/releases/download/jdk-21.0.5%2B11/OpenJDK21U-jdk_aarch64_mac_hotspot_21.0.5_11.tar.gz"
+             :jdk_url_linux "https://github.com/adoptium/temurin21-binaries/releases/download/jdk-21.0.5%2B11/OpenJDK21U-jdk_x64_linux_hotspot_21.0.5_11.tar.gz"
+             :git_url_mac "https://sourceforge.net/projects/git-osx-installer/files/latest/download"
+             :vscode_url_mac "https://update.code.visualstudio.com/latest/darwin-arm64/stable"
+             :vscode_url_linux "https://update.code.visualstudio.com/latest/linux-deb-x64/stable"
+             :maven_url_mac "https://dlcdn.apache.org/maven/maven-3/3.9.16/binaries/apache-maven-3.9.16-bin.tar.gz"
+             :maven_url_linux "https://dlcdn.apache.org/maven/maven-3/3.9.16/binaries/apache-maven-3.9.16-bin.tar.gz"
+             :ant_url_mac "https://dlcdn.apache.org/ant/binaries/apache-ant-1.10.17-bin.tar.gz"
+             :ant_url_linux "https://dlcdn.apache.org/ant/binaries/apache-ant-1.10.17-bin.tar.gz"
+             :intellij_url_linux "https://download.jetbrains.com/idea/idea-2026.1.3.tar.gz"}}
+
+ {:name "Load URLs (win)"
+  :when "ansible_os_family == 'Windows'"
+  :set_fact {:jdk_url_win "https://github.com/adoptium/temurin21-binaries/releases/download/jdk-21.0.5%2B11/OpenJDK21U-jdk_x64_windows_hotspot_21.0.5_11.zip"
+             :git_url_win "https://github.com/git-for-windows/git/releases/download/v2.47.1.windows.1/Git-2.47.1-64-bit.exe"
+             :intellij_url_win "https://download.jetbrains.com/idea/idea-2026.1.3-aarch64.exe"
+             :vscode_url_win "https://update.code.visualstudio.com/latest/win32-arm64/stable"
+             :maven_url_win "https://dlcdn.apache.org/maven/maven-3/3.9.16/binaries/apache-maven-3.9.16-bin.zip"
+             :ant_url_win "https://dlcdn.apache.org/ant/binaries/apache-ant-1.10.17-bin.zip"
+             :winscp_url_win "https://winscp.net/download/WinSCP-6.5.6-Setup.exe"}}]
+
+
+=== FILE: tasks/install_java.edn ===
+[{:name "Ensure java directory exists (unix)"
+  :when "ansible_os_family == 'Unix'"
+  :shell {:cmd "mkdir -p $HOME/java; echo '✅ Dir ready'"}}
+
+ {:name "⬇  Download JDK (unix)"
+  :when "ansible_os_family == 'Unix'"
+  :shell {:cmd "rm -f /tmp/jdk21.tar.gz; if [ \"$(uname -s)\" = \"Darwin\" ]; then curl -L -s -o /tmp/jdk21.tar.gz ${jdk_url_mac}; else curl -L -s -o /tmp/jdk21.tar.gz ${jdk_url_linux}; fi; echo '✅ Downloaded'"}}
+
+ {:name "📦 Extract JDK (unix)"
+  :when "ansible_os_family == 'Unix'"
+  :shell {:cmd "tar -xzf /tmp/jdk21.tar.gz -C $HOME/java; ls $HOME/java; echo '✅ Extracted'"}}
+
+ {:name "🔗 Symlink JDK (unix)"
+  :when "ansible_os_family == 'Unix'"
+  :shell {:cmd "ln -sfn $HOME/java/jdk-21.0.5+11 $HOME/java/jdk-21; echo '✅ Linked'"}}
+
+ {:name "⚙️  Update shell rc (unix)"
+  :when "ansible_os_family == 'Unix'"
+  :shell {:cmd "if [ \"$(uname -s)\" = \"Darwin\" ]; then RC=$HOME/.zshrc; JH=$HOME/java/jdk-21/Contents/Home; else RC=$HOME/.bashrc; JH=$HOME/java/jdk-21; fi; printf '\\nexport JAVA_HOME=%s\\nexport PATH=$JAVA_HOME/bin:$PATH\\n' \"$JH\" >> \"$RC\"; echo '✅ Updated'"}}
+
+ {:name "🔍 Verify Java (unix)"
+  :when "ansible_os_family == 'Unix'"
+  :shell {:cmd "if [ \"$(uname -s)\" = \"Darwin\" ]; then $HOME/java/jdk-21/Contents/Home/bin/java --version; else $HOME/java/jdk-21/bin/java --version; fi"}}
+
+ {:name "Ensure java directory exists (win)"
+  :when "ansible_os_family == 'Windows'"
+  :powershell {:inline "New-Item -ItemType Directory -Force -Path $env:USERPROFILE\\java | Out-Null; Write-Host '✅ Dir ready'"}}
+
+ {:name "⬇  Copy JDK from network share (win)"
+  :when "ansible_os_family == 'Windows'"
+  :powershell {:inline "$src = \"${jdk_url_win}\"; Write-Host \"Source: $src\"; if (-not (Test-Path -LiteralPath $src)) { Write-Host '❌ ERREUR: fichier source introuvable ou inaccessible depuis ce contexte'; Write-Host \"   Chemin teste: $src\"; exit 1 }; try { Copy-Item -LiteralPath $src -Destination $env:TEMP\\jdk21.zip -Force -ErrorAction Stop } catch { Write-Host \"❌ ERREUR de copie: $($_.Exception.Message)\"; exit 1 }; if (-not (Test-Path $env:TEMP\\jdk21.zip)) { Write-Host '❌ ERREUR: fichier absent apres copie'; exit 1 }; $size = (Get-Item $env:TEMP\\jdk21.zip).Length; Write-Host \"✅ Copie OK ($size octets)\""}}
+
+ {:name "📦 Extract JDK (win)"
+  :when "ansible_os_family == 'Windows'"
+  :powershell {:inline "try { Expand-Archive -Path $env:TEMP\\jdk21.zip -DestinationPath $env:USERPROFILE\\java -Force -ErrorAction Stop } catch { Write-Host \"❌ ERREUR extraction: $($_.Exception.Message)\"; exit 1 }; $count = (Get-ChildItem $env:USERPROFILE\\java -Recurse -File | Measure-Object).Count; if ($count -eq 0) { Write-Host '❌ ERREUR: extraction vide'; exit 1 }; Write-Host \"✅ Extrait ($count fichiers)\""}}
+
+ {:name "⚙️  Set JAVA_HOME and PATH (win)"
+  :when "ansible_os_family == 'Windows'"
+  :powershell {:inline "$javaExe = Get-ChildItem -Path $env:USERPROFILE\\java -Recurse -Filter java.exe -ErrorAction SilentlyContinue | Select-Object -First 1; if (-not $javaExe) { Write-Host '❌ ERREUR: java.exe introuvable apres extraction. Contenu du dossier:'; Get-ChildItem -Path $env:USERPROFILE\\java -Recurse | ForEach-Object { Write-Host \"   $($_.FullName)\" }; exit 1 }; $jdk = $javaExe.Directory.Parent.FullName; [Environment]::SetEnvironmentVariable('JAVA_HOME', $jdk, 'User'); $p = [Environment]::GetEnvironmentVariable('Path','User'); if ($p -notlike ('*' + $jdk + '\\bin*')) { [Environment]::SetEnvironmentVariable('Path', $p + ';' + $jdk + '\\bin', 'User') }; Write-Host \"✅ JAVA_HOME = $jdk\""}}
+
+ {:name "🔍 Verify Java (win)"
+  :when "ansible_os_family == 'Windows'"
+  :powershell {:inline "$javaExe = Get-ChildItem -Path $env:USERPROFILE\\java -Recurse -Filter java.exe -ErrorAction SilentlyContinue | Select-Object -First 1; if (-not $javaExe) { Write-Host '❌ ERREUR: java.exe introuvable'; exit 1 }; & $javaExe.FullName --version"}}]
+
+
+=== FILE: tasks/install_git.edn ===
+[{:name "🔍/📦 Ensure Git (unix)"
+  :when "ansible_os_family == 'Unix'"
+  :shell {:cmd "if command -v git >/dev/null 2>&1; then echo '✅ Git already present'; git --version; else if [ \"$(uname -s)\" = \"Linux\" ]; then sudo apt-get update -y && sudo apt-get install -y git; echo '✅ Git installed'; else echo '⚠️  Git absent - install Xcode CLT: xcode-select --install'; fi; fi"}}
+
+ {:name "⬇  Copy Git installer from network share (win)"
+  :when "ansible_os_family == 'Windows'"
+  :powershell {:inline "$src = \"${git_url_win}\"; Write-Host \"Source: $src\"; if (-not (Test-Path -LiteralPath $src)) { Write-Host '❌ ERREUR: fichier source introuvable ou inaccessible'; exit 1 }; try { Copy-Item -LiteralPath $src -Destination $env:TEMP\\git-setup.exe -Force -ErrorAction Stop } catch { Write-Host \"❌ ERREUR de copie: $($_.Exception.Message)\"; exit 1 }; if (-not (Test-Path $env:TEMP\\git-setup.exe)) { Write-Host '❌ ERREUR: fichier absent apres copie'; exit 1 }; $size = (Get-Item $env:TEMP\\git-setup.exe).Length; Write-Host \"✅ Copie OK ($size octets)\""}}
+
+ {:name "⚙️  Silent install Git (win)"
+  :when "ansible_os_family == 'Windows'"
+  :powershell {:inline "Start-Process -FilePath $env:TEMP\\git-setup.exe -ArgumentList '/VERYSILENT','/NORESTART','/NOCANCEL','/SP-','/CLOSEAPPLICATIONS' -Wait; Write-Host '✅ Installed'"}}
+
+ {:name "🔗 Add Git to PATH (win)"
+  :when "ansible_os_family == 'Windows'"
+  :powershell {:inline "$p = [Environment]::GetEnvironmentVariable('Path','User'); if ($p -notlike '*Git\\cmd*') { [Environment]::SetEnvironmentVariable('Path', $p + ';C:\\Program Files\\Git\\cmd', 'User') }; Write-Host '✅ Git added to PATH'"}}
+
+ {:name "🔍 Verify Git (win)"
+  :when "ansible_os_family == 'Windows'"
+  :powershell {:inline "if (Test-Path 'C:\\Program Files\\Git\\cmd\\git.exe') { & 'C:\\Program Files\\Git\\cmd\\git.exe' --version } else { Write-Host '❌ git.exe introuvable apres install'; exit 1 }"}}]
+
+
+=== FILE: tasks/install_intellij.edn ===
+[{:name "⬇📦 Install IntelliJ (unix)"
+  :when "ansible_os_family == 'Unix'"
+  :shell {:cmd "if [ \"$(uname -s)\" = \"Linux\" ]; then rm -f /tmp/idea.tar.gz; curl -L -s -o /tmp/idea.tar.gz ${intellij_url_linux}; mkdir -p $HOME/idea; tar -xzf /tmp/idea.tar.gz -C $HOME/idea --strip-components=1; mkdir -p $HOME/.local/share/applications; printf '[Desktop Entry]\\nVersion=1.0\\nType=Application\\nName=IntelliJ IDEA\\nIcon=%s/bin/idea.svg\\nExec=\"%s/bin/idea.sh\" %%f\\nComment=IntelliJ IDEA\\nCategories=Development;IDE;\\nTerminal=false\\nStartupWMClass=jetbrains-idea\\n' \"$HOME/idea\" \"$HOME/idea\" > $HOME/.local/share/applications/jetbrains-idea.desktop; echo '✅ Installed (linux)'; else echo 'ℹ️  IntelliJ auto-install not configured for macOS - download manually from jetbrains.com'; fi"}}
+
+ {:name "🔍 Verify IntelliJ (unix)"
+  :when "ansible_os_family == 'Unix'"
+  :shell {:cmd "if [ \"$(uname -s)\" = \"Linux\" ]; then test -f $HOME/idea/bin/idea.sh && echo '✅ IntelliJ installed' || echo '⚠️  Not found'; fi"}}
+
+ {:name "⬇  Copy IntelliJ installer from network share (win)"
+  :when "ansible_os_family == 'Windows'"
+  :powershell {:inline "$src = \"${intellij_url_win}\"; Write-Host \"Source: $src\"; if (-not (Test-Path -LiteralPath $src)) { Write-Host '❌ ERREUR: fichier source introuvable ou inaccessible'; exit 1 }; try { Copy-Item -LiteralPath $src -Destination $env:TEMP\\idea-setup.exe -Force -ErrorAction Stop } catch { Write-Host \"❌ ERREUR de copie: $($_.Exception.Message)\"; exit 1 }; if (-not (Test-Path $env:TEMP\\idea-setup.exe)) { Write-Host '❌ ERREUR: fichier absent apres copie'; exit 1 }; $size = (Get-Item $env:TEMP\\idea-setup.exe).Length; Write-Host \"✅ Copie OK ($size octets)\""}}
+
+ {:name "⚙️  Silent install IntelliJ (win)"
+  :when "ansible_os_family == 'Windows'"
+  :powershell {:inline "Start-Process -FilePath $env:TEMP\\idea-setup.exe -ArgumentList '/S','/D=C:\\Program Files\\JetBrains\\IntelliJ IDEA Community' -Wait; Write-Host '✅ Installed'"}}
+
+ {:name "🔗 Create Desktop shortcut (win)"
+  :when "ansible_os_family == 'Windows'"
+  :powershell {:inline "$exe = 'C:\\Program Files\\JetBrains\\IntelliJ IDEA Community\\bin\\idea64.exe'; if (Test-Path $exe) { $ws = New-Object -ComObject WScript.Shell; $sc = $ws.CreateShortcut(\"$env:USERPROFILE\\Desktop\\IntelliJ IDEA.lnk\"); $sc.TargetPath = $exe; $sc.WorkingDirectory = 'C:\\Program Files\\JetBrains\\IntelliJ IDEA Community\\bin'; $sc.Save(); Write-Host '✅ Shortcut created' }"}}
+
+ {:name "🔍 Verify IntelliJ (win)"
+  :when "ansible_os_family == 'Windows'"
+  :powershell {:inline "if (Test-Path 'C:\\Program Files\\JetBrains\\IntelliJ IDEA Community\\bin\\idea64.exe') { Write-Host '✅ IntelliJ installed' } else { Write-Host '❌ idea64.exe introuvable apres install'; exit 1 }"}}]
+
+
+=== FILE: tasks/install_vscode.edn ===
+[{:name "⬇  Download VS Code (mac)"
+  :when "ansible_os_family == 'Unix'"
+  :shell {:cmd "if [ \"$(uname -s)\" = \"Darwin\" ]; then curl -L -s -o /tmp/vscode.zip \"${vscode_url_mac}\"; unzip -oq /tmp/vscode.zip -d /Applications; ln -sfn '/Applications/Visual Studio Code.app' \"$HOME/Desktop/Visual Studio Code.app\"; echo '✅ Installed (mac)'; else rm -f /tmp/vscode.deb; curl -L -s -o /tmp/vscode.deb \"${vscode_url_linux}\"; sudo apt-get install -y /tmp/vscode.deb; echo '✅ Installed (linux)'; fi"}}
+
+ {:name "🔍 Verify VS Code (unix)"
+  :when "ansible_os_family == 'Unix'"
+  :shell {:cmd "if [ \"$(uname -s)\" = \"Darwin\" ]; then ls /Applications | grep -i 'Visual Studio Code' || echo '⚠️  Not found'; else command -v code >/dev/null 2>&1 && code --version || echo '⚠️  Not found'; fi"}}
+
+ {:name "⬇  Copy VS Code installer from network share (win)"
+  :when "ansible_os_family == 'Windows'"
+  :powershell {:inline "$src = \"${vscode_url_win}\"; Write-Host \"Source: $src\"; if (-not (Test-Path -LiteralPath $src)) { Write-Host '❌ ERREUR: fichier source introuvable ou inaccessible'; exit 1 }; try { Copy-Item -LiteralPath $src -Destination $env:TEMP\\vscode-setup.exe -Force -ErrorAction Stop } catch { Write-Host \"❌ ERREUR de copie: $($_.Exception.Message)\"; exit 1 }; if (-not (Test-Path $env:TEMP\\vscode-setup.exe)) { Write-Host '❌ ERREUR: fichier absent apres copie'; exit 1 }; $size = (Get-Item $env:TEMP\\vscode-setup.exe).Length; Write-Host \"✅ Copie OK ($size octets)\""}}
+
+ {:name "⚙️  Silent install VS Code (win)"
+  :when "ansible_os_family == 'Windows'"
+  :powershell {:inline "Start-Process -FilePath $env:TEMP\\vscode-setup.exe -ArgumentList '/VERYSILENT','/NORESTART','/MERGETASKS=!runcode,desktopicon' -Wait; Write-Host '✅ Installed'"}}
+
+ {:name "🔗 Add VS Code to PATH (win)"
+  :when "ansible_os_family == 'Windows'"
+  :powershell {:inline "$p = [Environment]::GetEnvironmentVariable('Path','User'); if ($p -notlike '*Microsoft VS Code\\bin*') { [Environment]::SetEnvironmentVariable('Path', $p + ';C:\\Program Files\\Microsoft VS Code\\bin', 'User') }; Write-Host '✅ VS Code added to PATH'"}}
+
+ {:name "🔍 Verify VS Code (win)"
+  :when "ansible_os_family == 'Windows'"
+  :powershell {:inline "if (Test-Path 'C:\\Program Files\\Microsoft VS Code\\Code.exe') { Write-Host '✅ VS Code installed' } else { Write-Host '❌ Code.exe introuvable apres install'; exit 1 }"}}]
+
+
+=== FILE: tasks/install_maven.edn ===
+[{:name "Ensure maven directory exists (unix)"
+  :when "ansible_os_family == 'Unix'"
+  :shell {:cmd "mkdir -p $HOME/maven; echo '✅ Dir ready'"}}
+
+ {:name "⬇  Download Maven (unix)"
+  :when "ansible_os_family == 'Unix'"
+  :shell {:cmd "rm -f /tmp/maven.tar.gz; if [ \"$(uname -s)\" = \"Darwin\" ]; then curl -L -s -o /tmp/maven.tar.gz ${maven_url_mac}; else curl -L -s -o /tmp/maven.tar.gz ${maven_url_linux}; fi; echo '✅ Downloaded'"}}
+
+ {:name "📦 Extract Maven (unix)"
+  :when "ansible_os_family == 'Unix'"
+  :shell {:cmd "tar -xzf /tmp/maven.tar.gz -C $HOME/maven; echo '✅ Extracted'"}}
+
+ {:name "⚙️  Update shell rc (unix)"
+  :when "ansible_os_family == 'Unix'"
+  :shell {:cmd "if [ \"$(uname -s)\" = \"Darwin\" ]; then RC=$HOME/.zshrc; else RC=$HOME/.bashrc; fi; printf '\\nexport MAVEN_HOME=%s/apache-maven-3.9.16\\nexport PATH=$MAVEN_HOME/bin:$PATH\\n' \"$HOME/maven\" >> \"$RC\"; echo '✅ Updated'"}}
+
+ {:name "🔍 Verify Maven (unix)"
+  :when "ansible_os_family == 'Unix'"
+  :shell {:cmd "if [ \"$(uname -s)\" = \"Darwin\" ]; then JAVA_HOME=$HOME/java/jdk-21/Contents/Home $HOME/maven/apache-maven-3.9.16/bin/mvn -v; else JAVA_HOME=$HOME/java/jdk-21 $HOME/maven/apache-maven-3.9.16/bin/mvn -v; fi"}}
+
+ {:name "Ensure maven directory exists (win)"
+  :when "ansible_os_family == 'Windows'"
+  :powershell {:inline "New-Item -ItemType Directory -Force -Path $env:USERPROFILE\\maven | Out-Null; Write-Host '✅ Dir ready'"}}
+
+ {:name "⬇  Copy Maven from network share (win)"
+  :when "ansible_os_family == 'Windows'"
+  :powershell {:inline "$src = \"${maven_url_win}\"; Write-Host \"Source: $src\"; if (-not (Test-Path -LiteralPath $src)) { Write-Host '❌ ERREUR: fichier source introuvable ou inaccessible'; exit 1 }; try { Copy-Item -LiteralPath $src -Destination $env:TEMP\\maven.zip -Force -ErrorAction Stop } catch { Write-Host \"❌ ERREUR de copie: $($_.Exception.Message)\"; exit 1 }; if (-not (Test-Path $env:TEMP\\maven.zip)) { Write-Host '❌ ERREUR: fichier absent apres copie'; exit 1 }; $size = (Get-Item $env:TEMP\\maven.zip).Length; Write-Host \"✅ Copie OK ($size octets)\""}}
+
+ {:name "📦 Extract Maven (win)"
+  :when "ansible_os_family == 'Windows'"
+  :powershell {:inline "try { Expand-Archive -Path $env:TEMP\\maven.zip -DestinationPath $env:USERPROFILE\\maven -Force -ErrorAction Stop } catch { Write-Host \"❌ ERREUR extraction: $($_.Exception.Message)\"; exit 1 }; Write-Host '✅ Extracted'"}}
+
+ {:name "🧹 Remove old Maven from PATH (win)"
+  :when "ansible_os_family == 'Windows'"
+  :powershell {:inline "$pu = [Environment]::GetEnvironmentVariable('Path','User'); $cu = ($pu -split ';' | Where-Object { $_ -notlike '*Maven*' }) -join ';'; [Environment]::SetEnvironmentVariable('Path', $cu, 'User'); $pm = [Environment]::GetEnvironmentVariable('Path','Machine'); $cm = ($pm -split ';' | Where-Object { $_ -notlike '*Maven*' }) -join ';'; [Environment]::SetEnvironmentVariable('Path', $cm, 'Machine'); Write-Host '✅ Old Maven removed from PATH (User + Machine)'"}}
+
+ {:name "⚙️  Set MAVEN_HOME and PATH (win)"
+  :when "ansible_os_family == 'Windows'"
+  :powershell {:inline "$mvnExe = Get-ChildItem -Path $env:USERPROFILE\\maven -Recurse -Filter mvn.cmd -ErrorAction SilentlyContinue | Select-Object -First 1; if (-not $mvnExe) { Write-Host '❌ ERREUR: mvn.cmd introuvable apres extraction'; exit 1 }; $m = $mvnExe.Directory.Parent.FullName; [Environment]::SetEnvironmentVariable('MAVEN_HOME', $m, 'User'); $p = [Environment]::GetEnvironmentVariable('Path','User'); if ($p -notlike ('*' + $m + '\\bin*')) { [Environment]::SetEnvironmentVariable('Path', $p + ';' + $m + '\\bin', 'User') }; Write-Host \"✅ MAVEN_HOME = $m\""}}
+
+ {:name "🔍 Verify Maven (win)"
+  :when "ansible_os_family == 'Windows'"
+  :powershell {:inline "$mvnExe = Get-ChildItem -Path $env:USERPROFILE\\maven -Recurse -Filter mvn.cmd -ErrorAction SilentlyContinue | Select-Object -First 1; if (-not $mvnExe) { Write-Host '❌ ERREUR: mvn.cmd introuvable'; exit 1 }; & $mvnExe.FullName -v"}}]
+
+
+=== FILE: tasks/install_ant.edn ===
+[{:name "Ensure ant directory exists (unix)"
+  :when "ansible_os_family == 'Unix'"
+  :shell {:cmd "mkdir -p $HOME/ant; echo '✅ Dir ready'"}}
+
+ {:name "⬇  Download Ant (unix)"
+  :when "ansible_os_family == 'Unix'"
+  :shell {:cmd "rm -f /tmp/ant.tar.gz; if [ \"$(uname -s)\" = \"Darwin\" ]; then curl -L -s -o /tmp/ant.tar.gz ${ant_url_mac}; else curl -L -s -o /tmp/ant.tar.gz ${ant_url_linux}; fi; echo '✅ Downloaded'"}}
+
+ {:name "📦 Extract Ant (unix)"
+  :when "ansible_os_family == 'Unix'"
+  :shell {:cmd "tar -xzf /tmp/ant.tar.gz -C $HOME/ant; echo '✅ Extracted'"}}
+
+ {:name "⚙️  Update shell rc (unix)"
+  :when "ansible_os_family == 'Unix'"
+  :shell {:cmd "if [ \"$(uname -s)\" = \"Darwin\" ]; then RC=$HOME/.zshrc; else RC=$HOME/.bashrc; fi; printf '\\nexport ANT_HOME=%s/apache-ant-1.10.17\\nexport PATH=$ANT_HOME/bin:$PATH\\n' \"$HOME/ant\" >> \"$RC\"; echo '✅ Updated'"}}
+
+ {:name "🔍 Verify Ant (unix)"
+  :when "ansible_os_family == 'Unix'"
+  :shell {:cmd "if [ \"$(uname -s)\" = \"Darwin\" ]; then JAVA_HOME=$HOME/java/jdk-21/Contents/Home $HOME/ant/apache-ant-1.10.17/bin/ant -version; else JAVA_HOME=$HOME/java/jdk-21 $HOME/ant/apache-ant-1.10.17/bin/ant -version; fi"}}
+
+ {:name "Ensure ant directory exists (win)"
+  :when "ansible_os_family == 'Windows'"
+  :powershell {:inline "New-Item -ItemType Directory -Force -Path $env:USERPROFILE\\ant | Out-Null; Write-Host '✅ Dir ready'"}}
+
+ {:name "⬇  Copy Ant from network share (win)"
+  :when "ansible_os_family == 'Windows'"
+  :powershell {:inline "$src = \"${ant_url_win}\"; Write-Host \"Source: $src\"; if (-not (Test-Path -LiteralPath $src)) { Write-Host '❌ ERREUR: fichier source introuvable ou inaccessible'; exit 1 }; try { Copy-Item -LiteralPath $src -Destination $env:TEMP\\ant.zip -Force -ErrorAction Stop } catch { Write-Host \"❌ ERREUR de copie: $($_.Exception.Message)\"; exit 1 }; if (-not (Test-Path $env:TEMP\\ant.zip)) { Write-Host '❌ ERREUR: fichier absent apres copie'; exit 1 }; $size = (Get-Item $env:TEMP\\ant.zip).Length; Write-Host \"✅ Copie OK ($size octets)\""}}
+
+ {:name "📦 Extract Ant (win)"
+  :when "ansible_os_family == 'Windows'"
+  :powershell {:inline "try { Expand-Archive -Path $env:TEMP\\ant.zip -DestinationPath $env:USERPROFILE\\ant -Force -ErrorAction Stop } catch { Write-Host \"❌ ERREUR extraction: $($_.Exception.Message)\"; exit 1 }; Write-Host '✅ Extracted'"}}
+
+ {:name "⚙️  Set ANT_HOME and PATH (win)"
+  :when "ansible_os_family == 'Windows'"
+  :powershell {:inline "$antExe = Get-ChildItem -Path $env:USERPROFILE\\ant -Recurse -Filter ant.bat -ErrorAction SilentlyContinue | Select-Object -First 1; if (-not $antExe) { Write-Host '❌ ERREUR: ant.bat introuvable apres extraction'; exit 1 }; $a = $antExe.Directory.Parent.FullName; [Environment]::SetEnvironmentVariable('ANT_HOME', $a, 'User'); $p = [Environment]::GetEnvironmentVariable('Path','User'); if ($p -notlike ('*' + $a + '\\bin*')) { [Environment]::SetEnvironmentVariable('Path', $p + ';' + $a + '\\bin', 'User') }; Write-Host \"✅ ANT_HOME = $a\""}}
+
+ {:name "🔍 Verify Ant (win)"
+  :when "ansible_os_family == 'Windows'"
+  :powershell {:inline "$antExe = Get-ChildItem -Path $env:USERPROFILE\\ant -Recurse -Filter ant.bat -ErrorAction SilentlyContinue | Select-Object -First 1; if (-not $antExe) { Write-Host '❌ ERREUR: ant.bat introuvable'; exit 1 }; & $antExe.FullName -version"}}]
+
+
+=== FILE: tasks/install_winscp.edn ===
+[{:name "ℹ️  WinSCP not applicable (unix)"
+  :when "ansible_os_family == 'Unix'"
+  :shell {:cmd "echo 'ℹ️  WinSCP is Windows-only. Use scp/sftp, FileZilla, or Nautilus SFTP instead.'"}}
+
+ {:name "⬇  Copy WinSCP installer from network share (win)"
+  :when "ansible_os_family == 'Windows'"
+  :powershell {:inline "$src = \"${winscp_url_win}\"; Write-Host \"Source: $src\"; if (-not (Test-Path -LiteralPath $src)) { Write-Host '❌ ERREUR: fichier source introuvable ou inaccessible'; exit 1 }; try { Copy-Item -LiteralPath $src -Destination $env:TEMP\\winscp-setup.exe -Force -ErrorAction Stop } catch { Write-Host \"❌ ERREUR de copie: $($_.Exception.Message)\"; exit 1 }; if (-not (Test-Path $env:TEMP\\winscp-setup.exe)) { Write-Host '❌ ERREUR: fichier absent apres copie'; exit 1 }; $size = (Get-Item $env:TEMP\\winscp-setup.exe).Length; Write-Host \"✅ Copie OK ($size octets)\""}}
+
+ {:name "⚙️  Silent install WinSCP (win)"
+  :when "ansible_os_family == 'Windows'"
+  :powershell {:inline "Start-Process -FilePath $env:TEMP\\winscp-setup.exe -ArgumentList '/VERYSILENT','/ALLUSERS','/NORESTART' -Wait; Write-Host '✅ Installed'"}}
+
+ {:name "🔍 Verify WinSCP (win)"
+  :when "ansible_os_family == 'Windows'"
+  :powershell {:inline "if (Test-Path 'C:\\Program Files (x86)\\WinSCP\\WinSCP.exe') { Write-Host '✅ WinSCP installed' } else { Write-Host '❌ WinSCP.exe introuvable apres install'; exit 1 }"}}]
+
